@@ -16,28 +16,50 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Vibrator
 import android.view.*
+import java.io.File
+import java.io.FileOutputStream
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Toast
+import java.io.PrintWriter
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
+
+
 
 class MetalBall : AppCompatActivity() , SensorEventListener {
 
     private var mSensorManager : SensorManager ?= null
     private var mAccelerometer : Sensor ?= null
     var ground : GroundView ?= null
+    var currentTime = System.currentTimeMillis().toString()
+    var point = 0
+    val database = FirebaseDatabase.getInstance()
+    val myRef = database.getReference(currentTime)
+    var name = ""
 
+    fun getName(view: View) {
+        var nameBox = findViewById<EditText>(R.id.setName) as EditText
+        name = nameBox.text.toString()
+    }
 
     fun isExternalStorageWritable(): Boolean {
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         if(isExternalStorageWritable()) {
             println(Environment.DIRECTORY_DCIM);
+            // Write a message to the database
+            myRef.child("header").setValue("Trial Gesture Program executed!")
         }
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         super.onCreate(savedInstanceState)
         // get reference of the service
         mSensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         // focus in accelerometer
-        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        mAccelerometer = mSensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         // setup the window
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
@@ -55,7 +77,9 @@ class MetalBall : AppCompatActivity() , SensorEventListener {
 
         // set the view
         ground = GroundView(this)
-        setContentView(ground)
+        setContentView(R.layout.activity_main)
+
+
     }
 
 
@@ -64,12 +88,30 @@ class MetalBall : AppCompatActivity() , SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null) {
-            ground!!.updateMe(event.values[1] , event.values[0])
-            val filename ="myfile.txt"
-            val fileContents = event.values[1].toString() +","+event.values[0].toString()
-            this.openFileOutput(filename, Context.MODE_PRIVATE).use {
+            val path = this.getExternalFilesDir(null)
+            val letDirectory = File(path, "sensorReadings")
+            if(!letDirectory.exists()) {letDirectory.mkdirs()}
+            val fileContents = event.values[0].toString() +","+event.values[1].toString()+","+event.values[2]+"\n"
+            val file = File(letDirectory, "Records2.txt")
+            FileOutputStream(file, true).use {
                 it.write(fileContents.toByteArray())
             }
+
+//            if(name == "") {
+//                myRef.child("header").setValue(this.findViewById(R.id.setName))
+//            } else {
+                myRef.child(point++.toString()).child("x").setValue(event.values[0])
+                myRef.child(point.toString()).child("y").setValue(event.values[1])
+                myRef.child(point.toString()).child("z").setValue(event.values[2])
+           // }
+           // ground!!.updateMe(event.values[1] , event.values[0])
+
+//            val filename = File(Environment.getExternalStorageDirectory()+"/yourlocation")
+//            val fileContents = event.values[1].toString() +","+event.values[0].toString()
+//            this.openFileOutput(filename, Context.MODE_PRIVATE).use {
+//                it.write(fileContents.toByteArray())
+//                println(filesDir.absolutePath)
+//            }
 
             //  File(" /storage/emulated/0/file.txt").writeText(event.values.toList().toString())
         }
@@ -86,7 +128,7 @@ class MetalBall : AppCompatActivity() , SensorEventListener {
         mSensorManager!!.unregisterListener(this)
     }
 
-    class DrawThread (surfaceHolder: SurfaceHolder , panel : GroundView) : Thread() {
+    class DrawThread (surfaceHolder: SurfaceHolder , panel: GroundView) : Thread() {
         private var surfaceHolder :SurfaceHolder ?= null
         private var panel : GroundView ?= null
         private var run = false
@@ -150,7 +192,7 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
     var noBorderX = false
     var noBorderY = false
 
-    var vibratorService : Vibrator ?= null
+  //  var vibratorService : Vibrator ?= null
     var thread : MetalBall.DrawThread?= null
 
 
@@ -168,7 +210,7 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
         icon = decodeResource(resources,R.drawable.abc_popup_background_mtrl_mult)
         picHeight = icon!!.height
         picWidth = icon!!.width
-        vibratorService = (getContext().getSystemService(Service.VIBRATOR_SERVICE)) as Vibrator
+       // vibratorService = (getContext().getSystemService(Service.VIBRATOR_SERVICE)) as Vibrator
     }
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
@@ -210,7 +252,7 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
             cx = (Windowwidth - picWidth).toFloat()
             lastGx = 0F
             if (noBorderX){
-                vibratorService!!.vibrate(100)
+              //  vibratorService!!.vibrate(100)
                 noBorderX = false
             }
         }
@@ -218,7 +260,7 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
             cx = 0F
             lastGx = 0F
             if(noBorderX){
-                vibratorService!!.vibrate(100)
+            //    vibratorService!!.vibrate(100)
                 noBorderX = false
             }
         }
@@ -228,7 +270,7 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
             cy = (Windowheight - picHeight).toFloat()
             lastGy = 0F
             if (noBorderY){
-                vibratorService!!.vibrate(100)
+             //   vibratorService!!.vibrate(100)
                 noBorderY = false
             }
         }
@@ -237,7 +279,9 @@ class GroundView(context: Context?) : SurfaceView(context), SurfaceHolder.Callba
             cy = 0F
             lastGy = 0F
             if (noBorderY){
-                vibratorService!!.vibrate(100)
+
+
+             //   vibratorService!!.vibrate(100)
                 noBorderY= false
             }
         }
